@@ -30,6 +30,7 @@ namespace NintrollerLib
         
         // General
         private bool               _connected                   = false;
+        private bool               _proControllerUSupport       = true;
         private INintrollerState   _state                       = new Wiimote();
         private CalibrationStorage _calibrations                = new CalibrationStorage();
         private ControllerType     _currentType                 = ControllerType.Unknown;
@@ -718,7 +719,7 @@ namespace NintrollerLib
                             // Extension/Type
                             // Not relyable for Pro Controller U
                             bool ext = (report[3] & 0x02) != 0;
-                            if (ext || true)
+                            if (ext || _proControllerUSupport)
                             {
                                 //lock (_readingObj)
                                 //{
@@ -945,6 +946,14 @@ namespace NintrollerLib
 
                                     case ControllerType.Guitar:
                                         _state = new Guitar();
+                                        if (_calibrations.GuitarCalibration.CalibrationEmpty)
+                                        {
+                                            _state.SetCalibration(Calibrations.CalibrationPreset.Default);
+                                        }
+                                        else
+                                        {
+                                            _state.SetCalibration(_calibrations.GuitarCalibration);
+                                        }
                                         applyReport = InputReport.BtnsAccExt;
                                         break;
 
@@ -1493,7 +1502,8 @@ namespace NintrollerLib
                 _currentType == ControllerType.Nunchuk || 
                 _currentType == ControllerType.NunchukB ||
                 _currentType == ControllerType.ClassicController || 
-                _currentType == ControllerType.ClassicControllerPro))
+                _currentType == ControllerType.ClassicControllerPro) ||
+                _currentType == ControllerType.Guitar)
             {
                 _state.SetCalibration(wiimoteCalibration);
             }
@@ -1548,6 +1558,15 @@ namespace NintrollerLib
             if (_state != null && _currentType == ControllerType.ProController)
             {
                 _state.SetCalibration(proCalibration);
+            }
+        }
+        public void SetCalibration(Guitar gutCalibration)
+        {
+            _calibrations.GuitarCalibration = gutCalibration;
+
+            if (_state != null && _currentType == ControllerType.Guitar)
+            {
+                _state.SetCalibration(gutCalibration);
             }
         }
         /// <summary>

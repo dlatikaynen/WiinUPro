@@ -8,7 +8,7 @@ namespace Shared
     public class DummyDevice : Stream
     {
         #region Properties
-        public ControllerType DeviceType { get; }
+        public ControllerType DeviceType { get; private set; }
 
         public INintrollerState State { get; set; }
 
@@ -35,42 +35,154 @@ namespace Shared
         {
             _nextQueue = new Queue<InputReport>();
             _reportQueue = new Queue<byte[]>();
-            State = state;
-
-            Type t = State.GetType();
-            if (t == typeof(ProController))
+            
+            if (state is ProController)
             {
                 DeviceType = ControllerType.ProController;
-                var pState = (ProController)state;
-                pState.LJoy.rawX = (short)pState.LJoy.centerX;
-                pState.LJoy.rawY = (short)pState.LJoy.centerY;
-                pState.RJoy.rawX = (short)pState.RJoy.centerX;
-                pState.RJoy.rawY = (short)pState.RJoy.centerY;
-                State = pState;
+                ConfigureProController((ProController)state);
             }
-            else if (t == typeof(GameCubeAdapter))
+            else if (state is Wiimote)
+            {
+                DeviceType = ControllerType.Wiimote;
+                ConfigureWiimote((Wiimote)state);
+            }
+            else if (state is GameCubeAdapter)
             {
                 DeviceType = ControllerType.Other;
-                var gState = (GameCubeAdapter)state;
-                gState.port1.joystick.rawX = gState.port1.joystick.centerX;
-                gState.port1.joystick.rawY = gState.port1.joystick.centerY;
-                gState.port1.cStick.rawX = gState.port1.cStick.centerX;
-                gState.port1.cStick.rawY = gState.port1.cStick.centerY;
-                gState.port2.joystick.rawX = gState.port2.joystick.centerX;
-                gState.port2.joystick.rawY = gState.port2.joystick.centerY;
-                gState.port2.cStick.rawX = gState.port2.cStick.centerX;
-                gState.port2.cStick.rawY = gState.port2.cStick.centerY;
-                gState.port3.joystick.rawX = gState.port3.joystick.centerX;
-                gState.port3.joystick.rawY = gState.port3.joystick.centerY;
-                gState.port3.cStick.rawX = gState.port3.cStick.centerX;
-                gState.port3.cStick.rawY = gState.port3.cStick.centerY;
-                gState.port4.joystick.rawX = gState.port4.joystick.centerX;
-                gState.port4.joystick.rawY = gState.port4.joystick.centerY;
-                gState.port4.cStick.rawX = gState.port4.cStick.centerX;
-                gState.port4.cStick.rawY = gState.port4.cStick.centerY;
-                State = gState;
+                ConfigureGameCubeAdapter((GameCubeAdapter)state);
+            }
+            else
+            {
+                State = state;
             }
         }
+
+        public void ChangeExtension(ControllerType type)
+        {
+            if (DeviceType == type)
+                return;
+
+            switch (type)
+            {
+                case ControllerType.Wiimote:
+                    if (State is IWiimoteExtension)
+                    {
+                        ConfigureWiimote(((IWiimoteExtension)State).wiimote);
+                    }
+                    else
+                    {
+                        ConfigureWiimote(new Wiimote());
+                    }
+                    break;
+
+                case ControllerType.Nunchuk:
+                case ControllerType.NunchukB:
+                    var nState = new Nunchuk();
+                    nState.SetCalibration(Calibrations.CalibrationPreset.Default);
+                    ConfigureNunchuk(nState);
+                    break;
+
+                case ControllerType.ClassicController:
+                    var cState = new ClassicController();
+                    cState.SetCalibration(Calibrations.CalibrationPreset.Default);
+                    ConfigureClassicController(cState);
+                    break;
+
+                case ControllerType.ClassicControllerPro:
+                    var ccpState = new ClassicControllerPro();
+                    ccpState.SetCalibration(Calibrations.CalibrationPreset.Default);
+                    ConfigureClassicControllerPro(ccpState);
+                    break;
+
+                case ControllerType.Guitar:
+                    var guitar = new Guitar();
+                    guitar.SetCalibration(Calibrations.CalibrationPreset.Default);
+                    ConfigureGuitar(guitar);
+                    break;
+
+                default:
+                    // Invalid
+                    return;
+            }
+
+            DeviceType = type;
+            _nextQueue.Enqueue(InputReport.Status);
+        }
+
+        #region State Configs
+        public void ConfigureProController(ProController pState)
+        {
+            pState.LJoy.rawX = (short)pState.LJoy.centerX;
+            pState.LJoy.rawY = (short)pState.LJoy.centerY;
+            pState.RJoy.rawX = (short)pState.RJoy.centerX;
+            pState.RJoy.rawY = (short)pState.RJoy.centerY;
+            State = pState;
+        }
+
+        public void ConfigureWiimote(Wiimote wState)
+        {
+            wState.accelerometer.rawX = (short)wState.accelerometer.centerX;
+            wState.accelerometer.rawY = (short)wState.accelerometer.centerY;
+            wState.accelerometer.rawZ = (short)wState.accelerometer.centerZ;
+            State = wState;
+        }
+
+        public void ConfigureNunchuk(Nunchuk nState)
+        {
+            nState.joystick.rawX = (short)nState.joystick.centerX;
+            nState.joystick.rawY = (short)nState.joystick.centerY;
+            nState.accelerometer.rawX = (short)nState.accelerometer.centerX;
+            nState.accelerometer.rawY = (short)nState.accelerometer.centerY;
+            nState.accelerometer.rawZ = (short)nState.accelerometer.centerZ;
+            State = nState;
+        }
+
+        public void ConfigureClassicController(ClassicController cState)
+        {
+            cState.LJoy.rawX = (short)cState.LJoy.centerX;
+            cState.LJoy.rawY = (short)cState.LJoy.centerY;
+            cState.RJoy.rawX = (short)cState.RJoy.centerX;
+            cState.RJoy.rawY = (short)cState.RJoy.centerY;
+            State = cState;
+        }
+
+        public void ConfigureClassicControllerPro(ClassicControllerPro ccpState)
+        {
+            ccpState.LJoy.rawX = (short)ccpState.LJoy.centerX;
+            ccpState.LJoy.rawY = (short)ccpState.LJoy.centerY;
+            ccpState.RJoy.rawX = (short)ccpState.RJoy.centerX;
+            ccpState.RJoy.rawY = (short)ccpState.RJoy.centerY;
+            State = ccpState;
+        }
+
+        public void ConfigureGuitar(Guitar guitar)
+        {
+            guitar.joystick.rawX = (short)guitar.joystick.centerX;
+            guitar.joystick.rawY = (short)guitar.joystick.centerY;
+            State = guitar;
+        }
+
+        public void ConfigureGameCubeAdapter(GameCubeAdapter gState)
+        {
+            gState.port1.joystick.rawX = gState.port1.joystick.centerX;
+            gState.port1.joystick.rawY = gState.port1.joystick.centerY;
+            gState.port1.cStick.rawX = gState.port1.cStick.centerX;
+            gState.port1.cStick.rawY = gState.port1.cStick.centerY;
+            gState.port2.joystick.rawX = gState.port2.joystick.centerX;
+            gState.port2.joystick.rawY = gState.port2.joystick.centerY;
+            gState.port2.cStick.rawX = gState.port2.cStick.centerX;
+            gState.port2.cStick.rawY = gState.port2.cStick.centerY;
+            gState.port3.joystick.rawX = gState.port3.joystick.centerX;
+            gState.port3.joystick.rawY = gState.port3.joystick.centerY;
+            gState.port3.cStick.rawX = gState.port3.cStick.centerX;
+            gState.port3.cStick.rawY = gState.port3.cStick.centerY;
+            gState.port4.joystick.rawX = gState.port4.joystick.centerX;
+            gState.port4.joystick.rawY = gState.port4.joystick.centerY;
+            gState.port4.cStick.rawX = gState.port4.cStick.centerX;
+            gState.port4.cStick.rawY = gState.port4.cStick.centerY;
+            State = gState;
+        }
+        #endregion
 
         #region System.IO.Stream Implimentation
         public override bool CanRead { get { return true; } }
@@ -193,14 +305,14 @@ namespace Shared
 
                     // DD - Data bytes padded to 16
 
-                    // Pro Controller
-                    buffer[6] = 0x00;
-                    buffer[7] = 0x00;
-                    buffer[8] = 0xA4;
-                    buffer[9] = 0x20;
-                    buffer[10] = 0x01;
-                    buffer[11] = 0x20;
-
+                    var typeBytes = BitConverter.GetBytes((long)DeviceType);
+                    buffer[6] = typeBytes[5];
+                    buffer[7] = typeBytes[4];
+                    buffer[8] = typeBytes[3];
+                    buffer[9] = typeBytes[2];
+                    buffer[10] = typeBytes[1];
+                    buffer[11] = typeBytes[0];
+                    
                     if (_lastReport.Length >= 4 && _lastReport[4] == 250)
                     {
                         //NextReport = DataReportMode;
@@ -238,6 +350,7 @@ namespace Shared
                     buffer[0] = 0x32;
                     buffer[1] = coreBtns[0];
                     buffer[2] = coreBtns[1];
+                    Array.Copy(GetExtension(), 0, buffer, 3, 8);
                     break;
 
                 case InputReport.BtnsAccIR: // 33 BB BB AA AA AA II II II II II II II II II II II II
@@ -250,24 +363,28 @@ namespace Shared
                     buffer[0] = 0x34;
                     buffer[1] = coreBtns[0];
                     buffer[2] = coreBtns[1];
+                    Array.Copy(GetExtension(), 0, buffer, 3, 19);
                     break;
 
                 case InputReport.BtnsAccExt: // 35 BB BB AA AA AA EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE
                     buffer[0] = 0x35;
                     buffer[1] = coreBtns[0];
                     buffer[2] = coreBtns[1];
+                    Array.Copy(GetExtension(), 0, buffer, 6, 16);
                     break;
 
                 case InputReport.BtnsIRExt: // 36 BB BB II II II II II II II II II II EE EE EE EE EE EE EE EE EE
                     buffer[0] = 0x36;
                     buffer[1] = coreBtns[0];
                     buffer[2] = coreBtns[1];
+                    Array.Copy(GetExtension(), 0, buffer, 13, 9);
                     break;
 
                 case InputReport.BtnsAccIRExt: // 37 BB BB AA AA AA II II II II II II II II II II EE EE EE EE EE EE
                     buffer[0] = 0x37;
                     buffer[1] = coreBtns[0];
                     buffer[2] = coreBtns[1];
+                    Array.Copy(GetExtension(), 0, buffer, 16, 6);
                     break;
 
                 case InputReport.ExtOnly: // 3d EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE EE
@@ -376,8 +493,8 @@ namespace Shared
                 case ControllerType.MotionPlus:
                 case ControllerType.MotionPlusCC:
                 case ControllerType.MotionPlusNunchuk:
+                case ControllerType.Guitar:
                 //case ControllerType.Drums:
-                //case ControllerType.Guitar:
                 //case ControllerType.TaikoDrum:
                 //case ControllerType.TurnTable:
                 //case ControllerType.DrawTablet:
@@ -471,15 +588,113 @@ namespace Shared
             }
             else if (DeviceType == ControllerType.Nunchuk || DeviceType == ControllerType.NunchukB)
             {
-                
+                var nun = (Nunchuk)State;
+
+                var x = BitConverter.GetBytes(nun.joystick.rawX);
+                var y = BitConverter.GetBytes(nun.joystick.rawY);
+
+                buf[0] = x[0];
+                buf[1] = y[0];
+
+                // Generate Accelerometer bytes
+
+                buf[5] = 0x00;
+                buf[5] += (byte)(!nun.Z ? 0x01 : 0x00);
+                buf[5] += (byte)(!nun.C ? 0x02 : 0x00);
             }
             else if (DeviceType == ControllerType.ClassicController)
             {
+                var cc = (ClassicController)State;
 
+                var lx = BitConverter.GetBytes(cc.LJoy.rawX);
+                var ly = BitConverter.GetBytes(cc.LJoy.rawY);
+                var rx = BitConverter.GetBytes(cc.RJoy.rawX);
+                var ry = BitConverter.GetBytes(cc.RJoy.rawY);
+                var l = BitConverter.GetBytes(cc.L.rawValue);
+                var r = BitConverter.GetBytes(cc.R.rawValue);
+
+                buf[0] = (byte)(lx[0] + (rx[0] << 3 & 0xC0));
+                buf[1] = (byte)(ly[0] + (rx[0] << 5 & 0xC0));
+                buf[2] = (byte)(ry[0] + (rx[0] << 7 & 0x80) + (l[0] << 2 & 0x60));
+                buf[3] = (byte)(r[0] + (l[0] << 5 & 0xE0));
+
+                buf[4] = 0x01;
+                buf[4] += (byte)(!cc.RFull ? 0x02 : 0x00);
+                buf[4] += (byte)(!cc.Plus ? 0x04 : 0x00);
+                buf[4] += (byte)(!cc.Home ? 0x08 : 0x00);
+
+                buf[4] += (byte)(!cc.Minus ? 0x10 : 0x00);
+                buf[4] += (byte)(!cc.LFull ? 0x20 : 0x00);
+                buf[4] += (byte)(!cc.Down ? 0x40 : 0x00);
+                buf[4] += (byte)(!cc.Right ? 0x80 : 0x00);
+
+                buf[5] = 0x00;
+                buf[5] += (byte)(!cc.Up ? 0x01 : 0x00);
+                buf[5] += (byte)(!cc.Left ? 0x02 : 0x00);
+                buf[5] += (byte)(!cc.ZR ? 0x04 : 0x00);
+                buf[5] += (byte)(!cc.X ? 0x08 : 0x00);
+                buf[5] += (byte)(!cc.A ? 0x10 : 0x00);
+                buf[5] += (byte)(!cc.Y ? 0x20 : 0x00);
+                buf[5] += (byte)(!cc.B ? 0x40 : 0x00);
+                buf[5] += (byte)(!cc.ZL ? 0x80 : 0x00);
             }
             else if (DeviceType == ControllerType.ClassicControllerPro)
             {
+                var ccp = (ClassicControllerPro)State;
 
+                var lx = BitConverter.GetBytes(ccp.LJoy.rawX);
+                var ly = BitConverter.GetBytes(ccp.LJoy.rawY);
+                var rx = BitConverter.GetBytes(ccp.RJoy.rawX);
+                var ry = BitConverter.GetBytes(ccp.RJoy.rawY);
+
+                buf[0] = (byte)(lx[0] + (rx[0] << 3 & 0xC0));
+                buf[1] = (byte)(ly[0] + (rx[0] << 5 & 0xC0));
+                buf[2] = (byte)(ry[0] + (rx[0] << 7 & 0x80));
+
+                buf[4] = 0x01;
+                buf[4] += (byte)(!ccp.R ? 0x02 : 0x00);
+                buf[4] += (byte)(!ccp.Plus ? 0x04 : 0x00);
+                buf[4] += (byte)(!ccp.Home ? 0x08 : 0x00);
+                buf[4] += (byte)(!ccp.Minus ? 0x10 : 0x00);
+                buf[4] += (byte)(!ccp.L ? 0x20 : 0x00);
+                buf[4] += (byte)(!ccp.Down ? 0x40 : 0x00);
+                buf[4] += (byte)(!ccp.Right ? 0x80 : 0x00);
+
+                buf[5] = 0x00;
+                buf[5] += (byte)(!ccp.Up ? 0x01 : 0x00);
+                buf[5] += (byte)(!ccp.Left ? 0x02 : 0x00);
+                buf[5] += (byte)(!ccp.ZR ? 0x04 : 0x00);
+                buf[5] += (byte)(!ccp.X ? 0x08 : 0x00);
+                buf[5] += (byte)(!ccp.A ? 0x10 : 0x00);
+                buf[5] += (byte)(!ccp.Y ? 0x20 : 0x00);
+                buf[5] += (byte)(!ccp.B ? 0x40 : 0x00);
+                buf[5] += (byte)(!ccp.ZL ? 0x80 : 0x00);
+            }
+            else if (DeviceType == ControllerType.Guitar)
+            {
+                var g = (Guitar)State;
+
+                var x = BitConverter.GetBytes(g.joystick.rawX);
+                var y = BitConverter.GetBytes(g.joystick.rawY);
+
+                buf[0] = (byte)(x[0] + 0xC0);
+                buf[1] = (byte)(y[0] + 0xC0);
+
+                // Toucbar
+                // Whammy bar
+
+                buf[4] = 0xAB;
+                buf[4] += (byte)(!g.Plus ? 0x04 : 0x00);
+                buf[4] += (byte)(!g.Minus ? 0x10 : 0x00);
+                buf[4] += (byte)(!g.StrumDown ? 0x40 : 0x00);
+
+                buf[5] = 0x06;
+                buf[5] += (byte)(!g.StrumUp ? 0x01 : 0x00);
+                buf[5] += (byte)(!g.Yellow ? 0x08 : 0x00);
+                buf[5] += (byte)(!g.Green ? 0x10 : 0x00);
+                buf[5] += (byte)(!g.Blue ? 0x20 : 0x00);
+                buf[5] += (byte)(!g.Red ? 0x40 : 0x00);
+                buf[5] += (byte)(!g.Orange ? 0x80 : 0x00);
             }
 
             return buf;

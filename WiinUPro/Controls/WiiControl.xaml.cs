@@ -12,10 +12,6 @@ namespace WiinUPro
     /// </summary>
     public partial class WiiControl : BaseControl, INintyControl
     {
-        public WiiControl()
-        {
-            InitializeComponent();
-        }
         public event Delegates.BoolArrDel OnChangeLEDs;
         public event Action<IRCamMode> OnChangeCameraMode;
         public event Action<IRCamSensitivity> OnChangeCameraSensitivty;
@@ -28,6 +24,16 @@ namespace WiinUPro
         protected Windows.TriggerCalibrationWindow _openTrigWindow;
         protected Windows.IRCalibrationWindow _openIRWindow;
         protected INintrollerState _lastState;
+
+        private WiiControl()
+        {
+            InitializeComponent();
+        }
+
+        public WiiControl(string deviceID) : this()
+        {
+            DeviceID = deviceID;
+        }
 
         public void ApplyInput(INintrollerState state)
         {
@@ -42,6 +48,7 @@ namespace WiinUPro
                 if (viewNunchuk.Visibility == Visibility.Visible) viewNunchuk.Visibility = Visibility.Collapsed;
                 if (viewClassicController.Visibility == Visibility.Visible) viewClassicController.Visibility = Visibility.Collapsed;
                 if (viewClassicControllerPro.Visibility == Visibility.Visible) viewClassicControllerPro.Visibility = Visibility.Collapsed;
+                if (viewGuitar.Visibility == Visibility.Visible) viewGuitar.Visibility = Visibility.Collapsed;
 
                 UpdateWiimoteVisual((Wiimote)state);
             }
@@ -50,6 +57,7 @@ namespace WiinUPro
                 if (viewNunchuk.Visibility != Visibility.Visible) viewNunchuk.Visibility = Visibility.Visible;
                 if (viewClassicController.Visibility == Visibility.Visible) viewClassicController.Visibility = Visibility.Collapsed;
                 if (viewClassicControllerPro.Visibility == Visibility.Visible) viewClassicControllerPro.Visibility = Visibility.Collapsed;
+                if (viewGuitar.Visibility == Visibility.Visible) viewGuitar.Visibility = Visibility.Collapsed;
 
                 var nun = (Nunchuk)state;
                 UpdateWiimoteVisual(nun.wiimote);
@@ -68,6 +76,7 @@ namespace WiinUPro
                 if (viewNunchuk.Visibility == Visibility.Visible) viewNunchuk.Visibility = Visibility.Collapsed;
                 if (viewClassicController.Visibility != Visibility.Visible) viewClassicController.Visibility = Visibility.Visible;
                 if (viewClassicControllerPro.Visibility == Visibility.Visible) viewClassicControllerPro.Visibility = Visibility.Collapsed;
+                if (viewGuitar.Visibility == Visibility.Visible) viewGuitar.Visibility = Visibility.Collapsed;
 
                 var cc = (ClassicController)state;
                 UpdateWiimoteVisual(cc.wiimote);
@@ -107,6 +116,7 @@ namespace WiinUPro
                 if (viewNunchuk.Visibility == Visibility.Visible) viewNunchuk.Visibility = Visibility.Collapsed;
                 if (viewClassicController.Visibility == Visibility.Visible) viewClassicController.Visibility = Visibility.Collapsed;
                 if (viewClassicControllerPro.Visibility != Visibility.Visible) viewClassicControllerPro.Visibility = Visibility.Visible;
+                if (viewGuitar.Visibility == Visibility.Visible) viewGuitar.Visibility = Visibility.Collapsed;
 
                 var ccp = (ClassicControllerPro)state;
                 UpdateWiimoteVisual(ccp.wiimote);
@@ -134,6 +144,33 @@ namespace WiinUPro
                 {
                     if (_calibrationTarget == App.CAL_CCP_LJOYSTICK) _openJoyWindow.Update(ccp.LJoy);
                     else if (_calibrationTarget == App.CAL_CCP_RJOYSTICK) _openJoyWindow.Update(ccp.RJoy);
+                }
+            }
+            else if (state is Guitar)
+            {
+                if (viewNunchuk.Visibility == Visibility.Visible) viewNunchuk.Visibility = Visibility.Collapsed;
+                if (viewClassicController.Visibility == Visibility.Visible) viewClassicController.Visibility = Visibility.Collapsed;
+                if (viewClassicControllerPro.Visibility == Visibility.Visible) viewClassicControllerPro.Visibility = Visibility.Collapsed;
+                if (viewGuitar.Visibility != Visibility.Visible) viewGuitar.Visibility = Visibility.Visible;
+
+                var gut = (Guitar)state;
+                UpdateWiimoteVisual(gut.wiimote);
+
+                gBtnGreen.Opacity = gut.Green ? 1 : 0;
+                gBtnRed.Opacity = gut.Red ? 1 : 0;
+                gBtnYellow.Opacity = gut.Yellow ? 1 : 0;
+                gBtnBlue.Opacity = gut.Blue ? 1 : 0;
+                gBtnOrange.Opacity = gut.Orange ? 1 : 0;
+                gBtnStrumUp.Opacity = gut.StrumUp ? 1 : 0;
+                gBtnStrumDown.Opacity = gut.StrumDown ? 1 : 0;
+                gBtnPlus.Opacity = gut.Plus ? 1 : 0;
+                gBtnMinus.Opacity = gut.Minus ? 1 : 0;
+                gStick.Margin = new Thickness(1236 + 30 * gut.joystick.X, 283 - 30 * gut.joystick.Y, 0, 0);
+                gStick.Margin = new Thickness(1236 + 30 * gut.joystick.X, 283 - 30 * gut.joystick.Y, 0, 0);
+
+                if (_openJoyWindow != null && _calibrationTarget == App.CAL_GUT_JOYSTICK)
+                {
+                    _openJoyWindow.Update(gut.joystick);
                 }
             }
         }
@@ -384,11 +421,35 @@ namespace WiinUPro
                     nonCalibrated = Calibrations.None.ClassicControllerProRaw.RJoy;
                     if (_lastState is ClassicControllerPro) curCalibration = ((ClassicControllerPro)_lastState).RJoy;
                     break;
+                case App.CAL_GUT_JOYSTICK:
+                    nonCalibrated = Calibrations.None.GuitarRaw.joystick;
+                    if (_lastState is Guitar) curCalibration = ((Guitar)_lastState).joystick;
+                    break;
                 default: return;
             }
 
             Windows.JoyCalibrationWindow joyCal = new Windows.JoyCalibrationWindow(nonCalibrated, curCalibration);
             _openJoyWindow = joyCal;
+
+#if DEBUG
+            // This will allow for the dummy device window to retain focus
+            if (DeviceID.StartsWith("Dummy"))
+            {
+                joyCal.Closed += (obj, args) =>
+                {
+                    if (joyCal.Apply)
+                    {
+                        OnJoystickCalibrated?.Invoke(joyCal.Calibration, _calibrationTarget, joyCal.FileName);
+                    }
+
+                    _openJoyWindow = null;
+                };
+
+                joyCal.Show();
+                return;
+            }
+#endif
+
             joyCal.ShowDialog();
 
             if (joyCal.Apply)
@@ -421,6 +482,25 @@ namespace WiinUPro
 
             Windows.TriggerCalibrationWindow trigCal = new Windows.TriggerCalibrationWindow(nonCalibrated, curCalibrated);
             _openTrigWindow = trigCal;
+
+#if DEBUG
+            if (DeviceID.StartsWith("Dummy"))
+            {
+                trigCal.Closed += (obj, args) =>
+                {
+                    if (trigCal.Apply)
+                    {
+                        OnTriggerCalibrated?.Invoke(trigCal.Calibration, _calibrationTarget, trigCal.FileName);
+                    }
+
+                    _openTrigWindow = null;
+                };
+                trigCal.Show();
+
+                return;
+            }
+#endif
+
             trigCal.ShowDialog();
 
             if (trigCal.Apply)

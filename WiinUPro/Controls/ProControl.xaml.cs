@@ -19,9 +19,14 @@ namespace WiinUPro
         protected bool _rightJoyOpen = false;
         protected ProController _lastState;
 
-        public ProControl()
+        private ProControl()
         {
             InitializeComponent();
+        }
+
+        public ProControl(string deviceID) : this()
+        {
+            DeviceID = deviceID;
         }
 
         public void ApplyInput(INintrollerState state)
@@ -143,9 +148,8 @@ namespace WiinUPro
         {
             _rightJoyOpen = (sender as FrameworkElement).Tag.Equals("JoyR");
             string joyTarget = _rightJoyOpen ? App.CAL_PRO_RJOYSTICK : App.CAL_PRO_LJOYSTICK;
-
-            var info = ObtainDeviceInfoDel();
-            var prefs = AppPrefs.Instance.GetDevicePreferences(info.DevicePath);
+            
+            var prefs = AppPrefs.Instance.GetDevicePreferences(DeviceID);
             string filename = "";
             prefs?.calibrationFiles.TryGetValue(joyTarget, out filename);
 
@@ -154,6 +158,26 @@ namespace WiinUPro
                 _rightJoyOpen ? _lastState.RJoy : _lastState.LJoy,
                 filename ?? "");
             _openJoyWindow = joyCal;
+
+#if DEBUG
+            // This will allow for the dummy device window to retain focus
+            if (DeviceID.StartsWith("Dummy"))
+            {
+                joyCal.Closed += (obj, args) =>
+                {
+                    if (joyCal.Apply)
+                    {
+                        OnJoyCalibrated?.Invoke(joyCal.Calibration, joyTarget, joyCal.FileName);
+                    }
+
+                    _openJoyWindow = null;
+                };
+
+                joyCal.Show();
+                return;
+            }
+#endif
+
             joyCal.ShowDialog();
 
             if (joyCal.Apply)

@@ -8,11 +8,11 @@ namespace WiinUPro
 {
     public abstract class BaseControl : UserControl, IBaseControl
     {
+        public string DeviceID { get; protected set; }
         public event Delegates.StringDel OnInputRightClick;
         public event Delegates.StringDel OnInputSelected;
         public event AssignmentCollection.AssignDelegate OnQuickAssign;
         public event Delegates.StringArrDel OnRemoveInputs;
-        public Delegates.ObtainDeviceInfo ObtainDeviceInfoDel { get; set; }
 
         protected string _inputPrefix = "";
 
@@ -41,6 +41,7 @@ namespace WiinUPro
             var element = sender as FrameworkElement;
             var tag = element == null ? "" : _inputPrefix + element.Tag as string;
 
+            // TOOD: Solve issue where this is being triggered twice for the guitar
             // Open input assignment window
             if (OnInputSelected != null && tag != null)
             {
@@ -166,10 +167,10 @@ namespace WiinUPro
 
     public interface IBaseControl
     {
+        string DeviceID { get; }
         event Delegates.StringDel OnInputRightClick;
         event Delegates.StringDel OnInputSelected;
         event AssignmentCollection.AssignDelegate OnQuickAssign;
         event Delegates.StringArrDel OnRemoveInputs;
-        Delegates.ObtainDeviceInfo ObtainDeviceInfoDel { get; set; }
     }
 }
